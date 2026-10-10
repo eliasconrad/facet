@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Subscribe · Shut</title>
+<link rel="icon" href="../favicon.svg">
+<link rel="stylesheet" href="shared.css">
+<style>
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;margin-top:44px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr;gap:36px}}
+.plans{display:grid;gap:12px}
+.plan{display:flex;align-items:center;gap:16px;padding:20px 22px;border-radius:22px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(var(--fg),.14);transition:background .15s,color .15s}
+.plan input{position:absolute;opacity:0;pointer-events:none}
+.dot{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(var(--fg),.35);flex:none;position:relative}
+.plan .name{font-weight:600}
+.plan .price{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;font-size:22px;letter-spacing:-.02em}
+.plan .per{font-size:14px;font-weight:400;opacity:.6;margin-left:4px}
+.tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;box-shadow:inset 0 0 0 1px currentColor;opacity:.7;margin-left:8px}
+.plan:has(input:checked){background:rgb(var(--fg));color:var(--bg)}
+.plan:has(input:checked) .dot{box-shadow:inset 0 0 0 1.5px var(--bg)}
+.plan:has(input:checked) .dot::after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--bg)}
+.box{padding:28px;border-radius:26px;background:rgba(var(--fg),.04)}
+label.field{display:block;font-size:13px;font-weight:600;color:rgba(var(--fg),.6);margin:0 0 8px}
+input[type=email]{width:100%;font:inherit;color:inherit;background:var(--bg);border:0;box-shadow:inset 0 0 0 1px rgba(var(--fg),.16);border-radius:16px;padding:14px 16px;margin-bottom:18px}
+ul.list{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:10px;font-size:15px}
+ul.list li{display:flex;gap:10px}
+ul.list li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:rgb(var(--fg));margin-top:9px}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 18px;font-variant-numeric:tabular-nums}
+.total strong{font-size:28px;letter-spacing:-.02em}
+#error{color:rgb(var(--fg));font-size:14px;margin-top:12px;min-height:1em}
+.go{width:100%}
+.plan .price,.tag{white-space:nowrap}
+@media (max-width:520px){.plan .name{display:flex;flex-direction:column;align-items:flex-start;gap:6px}.tag{margin-left:0}.plan{padding:18px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="../"><span class="mark"></span>Shut</a><a class="small muted" href="../#faq" style="text-decoration:none">Questions?</a></header>
+<main>
+  <h1>Subscribe to Shut.</h1>
+  <p class="sub">One subscription, no account. Your license key appears right after payment and unlocks Shut on your Mac and your iPhone.</p>
+  <div class="grid">
+    <form id="form" class="plans" aria-label="Plan">
+      <label class="plan"><input type="radio" name="plan" value="yearly" checked><span class="dot"></span><span class="name">Yearly<span class="tag">Best value</span></span><span class="price">€7.99<span class="per">/ year</span></span></label>
+      <label class="plan"><input type="radio" name="plan" value="monthly"><span class="dot"></span><span class="name">Monthly</span><span class="price">€0.99<span class="per">/ month</span></span></label>
+      <ul class="list muted">
+        <li>Blocks the apps and sites you pick, in every browser</li>
+        <li>Closes Tor and VPNs during a session, can't be quit</li>
+        <li>Plans, ⌘K picker, camera island, hours</li>
+        <li>Cancel anytime. The link is in your receipt email.</li>
+      </ul>
+    </form>
+    <div class="box">
+      <label class="field" for="email">Email for your receipt and key</label>
+      <input id="email" type="email" autocomplete="email" placeholder="you@example.com" inputmode="email">
+      <div class="total"><span class="muted">Today</span><strong id="total">€7.99</strong></div>
+      <button id="go" class="btn go" type="button">Continue to payment</button>
+      <p class="small muted" style="margin:14px 0 0">Secure payment by Stripe. Card, Apple Pay, Google Pay. Prices include VAT.</p>
+      <p id="error" role="alert"></p>
+    </div>
+  </div>
+</main>
+<footer><span>© 2026 Shut</span><a href="../privacy/">Privacy</a><a href="../terms/">Terms</a><a href="mailto:hallo@eliasconrad.eu">Contact</a></footer>
+<script>
+const API = 'https://facet-license.vercel.app/api/checkout'
+const form = document.getElementById('form'), go = document.getElementById('go'), err = document.getElementById('error'), total = document.getElementById('total')
+const wanted = new URLSearchParams(location.search).get('plan')
+if (wanted === 'monthly') form.querySelector('input[value=monthly]').checked = true
+const plan = () => form.querySelector('input[name=plan]:checked').value
+const sync = () => { total.textContent = plan() === 'monthly' ? '€0.99' : '€7.99' }
+form.addEventListener('change', sync); sync()
+go.addEventListener('click', async () => {
+  err.textContent = ''; go.disabled = true; go.textContent = 'One moment…'
+  try {
+    const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: plan(), email: document.getElementById('email').value }) })
+    const d = await r.json()
+    if (!d.url) throw new Error()
+    location.href = d.url
+  } catch {
+    err.textContent = 'The payment step did not open. Please try again in a moment.'
+    go.disabled = false; go.textContent = 'Continue to payment'
+  }
+})
+</script>
+</body>
+</html>

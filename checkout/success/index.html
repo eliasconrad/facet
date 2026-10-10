@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Your key · Shut</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../../favicon.svg">
+<link rel="stylesheet" href="../shared.css">
+<style>
+.key{display:block;margin:30px 0 14px;padding:22px 24px;border-radius:22px;background:rgba(var(--fg),.05);font:600 clamp(15px,2vw,19px)/1.5 ui-monospace,"SF Mono",Menlo,monospace;word-break:break-all;letter-spacing:.01em;user-select:all}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+ol{padding-left:22px;margin:34px 0 0;display:grid;gap:10px;color:rgba(var(--fg),.7);max-width:38rem}
+.state{margin-top:28px}
+</style>
+</head>
+<body>
+<header><a class="brand" href="../../"><span class="mark"></span>Shut</a></header>
+<main>
+  <h1 id="title">One moment…</h1>
+  <p class="sub" id="lead">Confirming your payment with Stripe.</p>
+  <div id="done" hidden>
+    <code class="key" id="key"></code>
+    <div class="row">
+      <a class="btn" id="open" href="#">Activate in Shut</a>
+      <button class="btn ghost" id="copy" type="button">Copy key</button>
+      <a class="btn ghost" href="../../Shut.dmg">Download for Mac</a>
+    </div>
+    <p class="small muted" id="mail" style="margin-top:14px"></p>
+    <ol>
+      <li><strong>Mac:</strong> click “Activate in Shut”, or open Shut → Settings → License and paste the key.</li>
+      <li><strong>iPhone:</strong> Shut → your initials (top right) → “Subscribed on your Mac? Enter your key”.</li>
+      <li>Keep this key. Save the page or copy it somewhere safe.</li>
+    </ol>
+  </div>
+  <p class="state small muted" id="state"></p>
+</main>
+<footer><span>© 2026 Shut</span><a href="../../privacy/">Privacy</a><a href="../../terms/">Terms</a><a href="mailto:hallo@eliasconrad.eu">Contact</a></footer>
+<script>
+const session = new URLSearchParams(location.search).get('session_id') || ''
+const $ = (id) => document.getElementById(id)
+async function load(attempt = 0) {
+  if (!session.startsWith('cs_')) { $('title').textContent = 'No payment found.'; $('lead').textContent = 'Open this page from the link after paying, or write to hallo@eliasconrad.eu.'; return }
+  try {
+    const r = await fetch('https://facet-license.vercel.app/api/license?session_id=' + encodeURIComponent(session))
+    const d = await r.json()
+    if (d.key) return show(d)
+    if (r.status === 402 && attempt < 8) { $('state').textContent = 'Waiting for the bank to confirm…'; return setTimeout(() => load(attempt + 1), 2500) }
+    throw new Error()
+  } catch {
+    if (attempt < 3) return setTimeout(() => load(attempt + 1), 2500)
+    $('title').textContent = 'Paid, but the key is late.'
+    $('lead').innerHTML = 'Refresh this page in a minute. If it stays like this, write to <a href="mailto:hallo@eliasconrad.eu?subject=Shut%20key%20' + session.slice(-8) + '">hallo@eliasconrad.eu</a> and we send it by hand.'
+  }
+}
+function show(d) {
+  $('title').textContent = 'Shut is yours.'
+  $('lead').textContent = 'This is your license key. It works while your subscription runs.'
+  $('key').textContent = d.key
+  $('open').href = 'facet://license?key=' + encodeURIComponent(d.key)
+  if (d.email) $('mail').textContent = 'Receipt sent to ' + d.email + '.'
+  $('done').hidden = false; $('state').textContent = ''
+}
+$('copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('key').textContent)
+  $('copy').textContent = 'Copied'; setTimeout(() => $('copy').textContent = 'Copy key', 1600)
+})
+load()
+</script>
+</body>
+</html>
