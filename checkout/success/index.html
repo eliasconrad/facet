@@ -4,17 +4,15 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Your key · Mute</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="../../favicon.svg">
-<link rel="stylesheet" href="../shared.css">
-<style>
-.key{display:block;margin:30px 0 14px;padding:22px 24px;border-radius:22px;background:rgba(var(--fg),.05);font:600 clamp(15px,2vw,19px)/1.5 ui-monospace,"SF Mono",Menlo,monospace;word-break:break-all;letter-spacing:.01em;user-select:all}
-.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
-ol{padding-left:22px;margin:34px 0 0;display:grid;gap:10px;color:rgba(var(--fg),.7);max-width:38rem}
-.state{margin-top:28px}
-</style>
+<link rel="icon" href="/facet/favicon.svg">
+<link rel="stylesheet" href="/facet/checkout/shared.css">
+<style>.key{background:rgba(var(--fg),.05);word-break:break-all;letter-spacing:.01em;-webkit-user-select:all;user-select:all;border-radius:22px;margin:30px 0 14px;padding:22px 24px;font:600 clamp(15px,2vw,19px)/1.5 ui-monospace,SF Mono,Menlo,monospace;display:block}.row{flex-wrap:wrap;gap:10px;margin-top:6px;display:flex}ol{color:rgba(var(--fg),.7);gap:10px;max-width:38rem;margin:34px 0 0;padding-left:22px;display:grid}.state{margin-top:28px}</style>
+  <script type="module" crossorigin src="/facet/assets/success-CTwthQ7s.js"></script>
+  <link rel="modulepreload" crossorigin href="/facet/assets/utils-CsajJt1M.js">
+  <link rel="stylesheet" crossorigin href="/facet/assets/success-BYBiKNFM.css">
 </head>
 <body>
-<header><a class="brand" href="../../"><span class="mark"></span>Mute</a></header>
+<header><a class="brand" href="/"><span class="mark"></span>Mute</a></header>
 <main>
   <h1 id="title">One moment…</h1>
   <p class="sub" id="lead">Confirming your payment with Stripe.</p>
@@ -22,8 +20,8 @@ ol{padding-left:22px;margin:34px 0 0;display:grid;gap:10px;color:rgba(var(--fg),
     <code class="key" id="key"></code>
     <div class="row">
       <a class="btn" id="open" href="#">Activate in Mute</a>
-      <button class="btn ghost" id="copy" type="button">Copy key</button>
-      <a class="btn ghost" href="../../Mute.dmg">Download for Mac</a>
+      <span id="copy-root"></span>
+      <a class="btn ghost" href="/Mute.dmg">Download for Mac</a>
     </div>
     <p class="small muted" id="mail" style="margin-top:14px"></p>
     <ol>
@@ -34,7 +32,7 @@ ol{padding-left:22px;margin:34px 0 0;display:grid;gap:10px;color:rgba(var(--fg),
   </div>
   <p class="state small muted" id="state"></p>
 </main>
-<footer><span>© 2026 Mute</span><a href="../../privacy/">Privacy</a><a href="../../terms/">Terms</a><a href="mailto:hallo@eliasconrad.eu">Contact</a></footer>
+<footer><span>© 2026 Mute</span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:hallo@eliasconrad.eu">Contact</a></footer>
 <script>
 const session = new URLSearchParams(location.search).get('session_id') || ''
 const $ = (id) => document.getElementById(id)
@@ -60,10 +58,6 @@ function show(d) {
   if (d.email) $('mail').textContent = 'Receipt sent to ' + d.email + '.'
   $('done').hidden = false; $('state').textContent = ''
 }
-$('copy').addEventListener('click', async () => {
-  await navigator.clipboard.writeText($('key').textContent)
-  $('copy').textContent = 'Copied'; setTimeout(() => $('copy').textContent = 'Copy key', 1600)
-})
 load()
 </script>
 </body>
