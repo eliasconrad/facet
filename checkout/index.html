@@ -27,6 +27,7 @@ ul.list li{display:flex;gap:10px}
 ul.list li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:rgb(var(--fg));margin-top:9px}
 .total{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 18px;font-variant-numeric:tabular-nums}
 .total strong{font-size:28px;letter-spacing:-.02em}
+#pay{margin:0 0 22px;min-height:120px}
 #error{color:rgb(var(--fg));font-size:14px;margin-top:12px;min-height:1em}
 .go{width:100%}
 .plan .price,.tag{white-space:nowrap}
@@ -52,6 +53,7 @@ ul.list li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;b
     <div class="box">
       <label class="field" for="email">Email for your receipt and key</label>
       <input id="email" type="email" autocomplete="email" placeholder="you@example.com" inputmode="email">
+      <div id="pay" hidden></div>
       <div class="total"><span class="muted">Today</span><strong id="total">€7.99</strong></div>
       <button id="go" class="btn go" type="button">Continue to payment</button>
       <p class="small muted" style="margin:14px 0 0">Secure payment by Stripe. Card, Apple Pay, Google Pay. Prices include VAT.</p>
@@ -60,26 +62,92 @@ ul.list li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;b
   </div>
 </main>
 <footer><span>© 2026 Mute</span><a href="../privacy/">Privacy</a><a href="../terms/">Terms</a><a href="mailto:hallo@eliasconrad.eu">Contact</a></footer>
+<script src="https://js.stripe.com/dahlia/stripe.js"></script>
 <script>
 const API = 'https://facet-license.vercel.app/api/checkout'
-const form = document.getElementById('form'), go = document.getElementById('go'), err = document.getElementById('error'), total = document.getElementById('total')
+const form = document.getElementById('form'), go = document.getElementById('go'), err = document.getElementById('error'), total = document.getElementById('total'), pay = document.getElementById('pay'), emailInput = document.getElementById('email')
 const wanted = new URLSearchParams(location.search).get('plan')
 if (wanted === 'monthly') form.querySelector('input[value=monthly]').checked = true
 const plan = () => form.querySelector('input[name=plan]:checked').value
 const sync = () => { total.textContent = plan() === 'monthly' ? '€0.99' : '€7.99' }
-form.addEventListener('change', sync); sync()
-go.addEventListener('click', async () => {
-  err.textContent = ''; go.disabled = true; go.textContent = 'One moment…'
+const dark = matchMedia('(prefers-color-scheme: dark)')
+
+// Payment field inside this page (Stripe Checkout "elements" mode). If the server has no
+// publishable key it answers with a hosted URL instead and the button redirects there.
+let checkout = null, actions = null, loading = 0
+const appearance = () => {
+  const ink = dark.matches ? '#ffffff' : '#000000', page = dark.matches ? '#000000' : '#ffffff'
+  return {
+    theme: dark.matches ? 'night' : 'stripe',
+    variables: {
+      colorPrimary: ink, colorBackground: page, colorText: ink, colorDanger: ink,
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
+      fontSizeBase: '16px', borderRadius: '16px', spacingUnit: '4px',
+    },
+    rules: {
+      '.Input': { border: 'none', boxShadow: `inset 0 0 0 1px ${dark.matches ? 'rgba(255,255,255,.16)' : 'rgba(0,0,0,.16)'}`, padding: '14px 16px' },
+      '.Input:focus': { boxShadow: `inset 0 0 0 1.5px ${ink}` },
+      '.Label': { fontSize: '13px', fontWeight: '600', color: dark.matches ? 'rgba(255,255,255,.6)' : 'rgba(0,0,0,.6)' },
+      '.Tab': { border: 'none', boxShadow: `inset 0 0 0 1px ${dark.matches ? 'rgba(255,255,255,.16)' : 'rgba(0,0,0,.16)'}` },
+      '.Tab--selected': { backgroundColor: ink, color: page },
+      '.TabIcon--selected': { fill: page }, '.TabLabel--selected': { color: page },
+    },
+  }
+}
+
+async function mount() {
+  const ticket = ++loading
+  pay.hidden = true; checkout = null; actions = null
+  go.disabled = true; go.textContent = 'One moment…'
   try {
-    const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: plan(), email: document.getElementById('email').value }) })
+    if (!window.Stripe) throw new Error('stripe.js')
+    const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: plan(), embedded: true }) })
     const d = await r.json()
-    if (!d.url) throw new Error()
-    location.href = d.url
+    if (ticket !== loading) return
+    if (!d.clientSecret) { go.disabled = false; go.textContent = 'Continue to payment'; return }
+    const sdk = Stripe(d.publishableKey).initCheckoutElementsSdk({ clientSecret: d.clientSecret, elementsOptions: { appearance: appearance() } })
+    pay.replaceChildren()
+    sdk.createPaymentElement({ layout: 'tabs' }).mount(pay)
+    const loaded = await sdk.loadActions()
+    if (ticket !== loading) return
+    if (loaded.type !== 'success') throw new Error(loaded.error?.message)
+    checkout = sdk; actions = loaded.actions
+    pay.hidden = false
+    go.disabled = false; go.textContent = plan() === 'monthly' ? 'Subscribe for €0.99 a month' : 'Subscribe for €7.99 a year'
   } catch {
-    err.textContent = 'The payment step did not open. Please try again in a moment.'
+    if (ticket !== loading) return
     go.disabled = false; go.textContent = 'Continue to payment'
   }
+}
+
+async function redirect() {
+  const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: plan(), email: emailInput.value }) })
+  const d = await r.json()
+  if (!d.url) throw new Error()
+  location.href = d.url
+}
+
+go.addEventListener('click', async () => {
+  err.textContent = ''
+  const label = go.textContent
+  go.disabled = true; go.textContent = 'One moment…'
+  try {
+    if (!actions) { await redirect(); return }
+    const email = emailInput.value.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Please enter your email. Your key is sent there too.'; emailInput.focus(); go.disabled = false; go.textContent = label; return }
+    const set = await actions.updateEmail(email)
+    if (set.type === 'error') throw new Error(set.error.message)
+    const result = await actions.confirm()
+    if (result.type === 'error') throw new Error(result.error.message)
+  } catch (e) {
+    err.textContent = (e && e.message) || 'Payment did not go through. Please try again.'
+    go.disabled = false; go.textContent = label
+  }
 })
+
+form.addEventListener('change', () => { sync(); mount() })
+dark.addEventListener('change', () => checkout?.changeAppearance(appearance()))
+sync(); mount()
 </script>
 </body>
 </html>
